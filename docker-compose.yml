@@ -1,0 +1,51 @@
+version: "3.8"
+
+services:
+
+  #Nginx Server
+  server:
+    container_name: 'tool_waocon_server'
+    image: 'nginx:alpine'
+    ports:
+      - '8083:80'
+    volumes:
+      - ./src:/var/www
+      - ./docker/nginx/conf.d/:/etc/nginx/conf.d/
+    depends_on:
+      - app
+      - mysql
+    networks:
+      - tool_waocon
+  
+  #PHP Service
+  app:
+    build:
+      context: ./docker
+      dockerfile: app.dockerfile
+    container_name: 'tool_waocon_app'
+    volumes:
+     - ./src:/var/www
+     - ./docker/php/local.ini:/usr/local/etc/php/conf.d/local.ini
+    networks:
+      - tool_waocon
+  
+  #MySQL Service
+  mysql:
+    image: mysql:8.0.32
+    container_name: 'tool_waocon_db'
+    # restart: unless-stopped
+    ports:
+      - "3307:3306"
+    volumes:
+      - ./docker/mysql/my.cnf:/etc/mysql/my.cnf
+    environment:
+      - MYSQL_ROOT_PASSWORD=123456
+      - MYSQL_DATABASE=tool-waocon
+      - MYSQL_USER=admin
+      - MYSQL_PASSWORD=123456
+    networks:
+      - tool_waocon
+
+networks:
+  tool_waocon:
+    driver: bridge
