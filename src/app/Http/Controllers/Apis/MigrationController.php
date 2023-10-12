@@ -18,9 +18,7 @@ class MigrationController extends Controller
 
     public function migration(Request $request): JsonResponse
     {
-        $this->migrationService->createMigration($request->all());
-        return response()->json([
-            'message' => 'Migration success'
-        ]);
+        $content = $this->migrationService->createMigration($request->all());
+        return response()->json($content);
     }
 }

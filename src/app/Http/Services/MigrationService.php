@@ -26,27 +26,36 @@ class MigrationService extends BaseCommand
      *
      * @throws \Exception
      */
-    public function createMigration(array $data)
+    public function createMigration(array $data): array
     {
         // get name table
-        $name = ucfirst(array_key_first($data));
+        $name = ucfirst($data['tableName']);
+        $dataTable = $data['data'];
         // check name table is update or create
         $name = 'Create'.$name.'Table';
-        //
         $tableName = Str::snake(trim($name));
-        $content = $this->createContentMigration(current($data));
+        $content = $this->createContentMigration($dataTable);
         $stub = $this->getStub();
-        $path = $this->getPath($tableName, storage_path('migrations'));
-        fopen($path, 'w') or die('Unable to open file!');
-        file_put_contents($path, $this->populateStub($stub, $tableName, $name, $content));
-        return $path;
+//        $path = $this->getPath($tableName, storage_path('migrations'));
+//        fopen($path, 'w') or die('Unable to open file!');
+//        file_put_contents($path, $contentFileMigration); // write content to file
+        return [
+            'name' => $this->getDatePrefix().'_'.$tableName.'.php',
+            'content' => $this->populateStub($stub, $tableName, $name, $content)
+        ];
     }
 
     protected function createContentMigration(array $data) {
         $content = '';
+        $framework = 'laravel';
+        // check framework is laravel or lumen
+        $data = array_filter($data, function($item) {
+            return $item['name'] !== 'id' && $item['name'] !== 'created_at' && $item['name'] !== 'updated_at';
+        });
+
         foreach ($data as $column=>$info) {
-            $content .= '$table->'.$info['type'].'("'.$column .'"'. ($info['length'] ? ', '.$info['length'] : ''). ')';
-            if (isset($info['nullable']) && $info['nullable']) {
+            $content = $this->contentNameAndTypeColumn($content, $info['name'], $info['type'], $info['length'] ?? null);
+            if (isset($info['isNull']) && !$info['isNull']) {
                 $content .= '->nullable()';
             }
             if (isset($info['unique']) && $info['unique']) {
@@ -63,14 +72,32 @@ class MigrationService extends BaseCommand
         return $content;
     }
 
+    function contentNameAndTypeColumn(string $content, string $name, string $type, ?int $length, $framework = 'laravel'): string
+    {
+        switch ($type) {
+            case 'varchar':
+                $type = 'string';
+                break;
+            case 'tinyint':
+                $type = 'tinyInteger';
+                break;
+            case 'bigint':
+                $type = 'bigInteger';
+                break;
+        }
+        $content .= '$table->'.$type.'("'.$name.'"'. ($length ? ', '.$length : ''). ')';
+        return $content;
+    }
+
     /**
      * Populate the place-holders in the migration stub.
      *
-     * @param  string  $stub
-     * @param  string|null  $table
+     * @param string $stub
+     * @param string $table
+     * @param string $name
      * @return string
      */
-    protected function populateStub($stub, $table, $name, $content = '')
+    protected function populateStub(string $stub, string $table, string $name, $content = '')
     {
         // Here we will replace the table place-holders with the table specified by
         // the developer, which is useful for quickly creating a tables creation
@@ -89,12 +116,10 @@ class MigrationService extends BaseCommand
             );
         }
 
-        if (!is_null($content)) {
-            $stub = str_replace(
-                ['{{ content }}', '{{content}}'],
-                $content, $stub
-            );
-        }
+        $stub = str_replace(
+            ['{{ content }}', '{{content}}'],
+            $content, $stub
+        );
 
         return $stub;
     }
